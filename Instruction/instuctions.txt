@@ -1,0 +1,17 @@
+You are free of choosing the dataset which can be found and download from https://catalog.data.gov/dataset. Within the project, it is possible to download files with extension csv, json or xlsx.
+There are counted requirements for the project:
+(2 point) choosing of dataset and task definition of the task of the Project
+(3 point) The code must be written in OOP style;
+(2 point) The data should be processed by using the module pandas;
+(2 point) In the code must be used processes or threads (for example, you can write processed data to the file by using processes or threads);
+(2 point) The data from the file should be saved in the SQLite3 or MongoDB database;
+(2 point) The data must be processed in two different way and both results must display in a different chart;
+(1 point) In the code must be shown exception handling;
+
+
+
+
+
+
+(3 point) The classes used within the project must be documented (What class does, what attributes it has; What method does, what arguments it takes, what the method return);
+(3 point) Make a presentation (max time 3 – 7 minute).
