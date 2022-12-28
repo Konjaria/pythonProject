@@ -1,26 +1,26 @@
-import json
-from tkinter import Tk, ttk, messagebox, Canvas
+import sqlite3
 import tkinter as tk
-import pymongo
-import pandas as pd
+from tkinter import Tk, ttk, messagebox
 import matplotlib.pyplot as plt
+import multiprocessing as mp
+import pandas as pd
 
 BACKGROUND_COLOR = "#6B011F"
 TEXT_COLOR = "#FEC260"
-
-
-# db_dict = db.to_dict(orient="records")
-# db_dict.append({"saba_konjaria": "12"})
-# database.insert_many(db_dict)
+RUN_TIME = 0
+DATABASE_PATH = "./data_input/data.db"
+FILE_NAME = './data_input/NYPD_Shooting_Incident_Data__Historic_.csv'
 
 
 class main_window(Tk):
     def __init__(self, database):
         super().__init__()
+        self.result_label = None
+        self.STATISTICAL_MURDER_FLAG_entry = None
         self.__canvas__ = None
         self.db = database
-        self.title("My Window")
-        self.geometry("570x500")
+        self.title("Shoot Incidences")
+        self.geometry("640x470")
         self.resizable(False, False)
         self.iconbitmap("data_input/detective.ico")
         self.config(bg=BACKGROUND_COLOR, padx=50, pady=70)
@@ -31,25 +31,18 @@ class main_window(Tk):
 
         # Variables
         self.combobox_variables1 = tk.StringVar()
-        self.combobox_variables2 = tk.StringVar()
 
         self.data_processing_lbl = tk.Label(text="Filter by: ", fg=TEXT_COLOR, bg=BACKGROUND_COLOR,
                                             font=("Sylfaen", 12, 'bold'))
-        self.data_processing_usr1 = ttk.Combobox(self, width=15, textvariable=self.combobox_variables1,
-                                                 values=['Incident key', 'Borough', 'Victim age-group', 'Victim Sex',
-                                                         'Victim Race', 'Jurisdiction code', 'Murder flag', 'Precinct',
-                                                         'Date/time'])
-        self.data_processing_usr2 = ttk.Combobox(self, width=15, textvariable=self.combobox_variables2,
-                                                 values=['Incident key', 'Borough', 'Victim age-group', 'Victim Sex',
-                                                         'Victim Race', 'Jurisdiction code', 'Murder flag', 'Precinct',
-                                                         'Date/time'])
+        self.data_processing_usr1 = ttk.Combobox(self, width=37, textvariable=self.combobox_variables1,
+                                                 values=[element for element in list(self.db.keys())
+                                                         if
+                                                         element not in ['Incident key', 'Date', 'Time']])
         self.data_processing_lbl.grid(row=1, column=0, pady=40)
         self.data_processing_usr1.grid(row=1, column=1)
-        self.data_processing_usr2.grid(row=1, column=2)
 
-        tk.Button(text="Build chart", bg="#0A2647", fg="#F1F7B5", command=self.filter_clicked, width=12).grid(row=5,
-                                                                                                              column=1,
-                                                                                                              pady=40)
+        tk.Button(text="Get Info", bg="#0A2647", fg="#F1F7B5", command=self.get_info, width=12).grid(row=1, column=2, padx=10)
+        tk.Button(text="Build Chart", bg="#0A2647", fg="#F1F7B5", command=self.filter_clicked,  width=12).grid(row=5, column=1, padx=10, pady=20, ipadx=20)
 
         # Chart types Variables
         self.area_var = tk.BooleanVar(self, False)
@@ -58,49 +51,335 @@ class main_window(Tk):
         self.pie_var = tk.BooleanVar(self, False)
 
         # area
-        self.area_button = tk.Checkbutton(self, text="Area chart", activeforeground="white", activebackground="#0A2647",
-                                          selectcolor="#0A2647", variable=self.area_var, fg="white", bg="#0A2647")
+        self.area_button = tk.Checkbutton(self, width=15, text="Area chart", activeforeground="white", fg="white", bg="#0A2647",
+                                          activebackground="#0A2647", selectcolor="#0A2647", variable=self.area_var)
         self.area_button.grid(row=2, column=0)
         # bar
-        self.bar_button = tk.Checkbutton(self, text="Bar chart", activeforeground="white", activebackground="#0A2647",
-                                         selectcolor="#0A2647", variable=self.bar_var, fg="white", bg="#0A2647")
+        self.bar_button = tk.Checkbutton(self, width=15, text="Bar chart", activeforeground="white", fg="white", bg="#0A2647",
+                                         activebackground="#0A2647", selectcolor="#0A2647", variable=self.bar_var,)
         self.bar_button.grid(row=2, column=1)
         # plot
-        self.plot_button = tk.Checkbutton(self, text="Plot chart", activeforeground="white", activebackground="#0A2647",
-                                          selectcolor="#0A2647", variable=self.plot_var, fg="white", bg="#0A2647")
+        self.plot_button = tk.Checkbutton(self, width=15, text="Plot chart", activeforeground="white", fg="white", bg="#0A2647",
+                                          activebackground="#0A2647", selectcolor="#0A2647", variable=self.plot_var)
         self.plot_button.grid(row=2, column=2)
         # pie
-        self.pie_button = tk.Checkbutton(self, text="Pie chart", activeforeground="white", activebackground="#0A2647",
-                                         selectcolor="#0A2647", variable=self.pie_var, fg="white", bg="#0A2647")
+        self.pie_button = tk.Checkbutton(self, width=15, text="Pie chart", activeforeground="white", fg="white", bg="#0A2647",
+                                         activebackground="#0A2647", selectcolor="#0A2647", variable=self.pie_var)
         self.pie_button.grid(row=3, column=1, pady=10)
-
         self.mainloop()
+
 
     def filter_clicked(self):
         try:
+            global RUN_TIME
             IS_EMPTY = ""
+            p1 = self.combobox_variables1.get()
+
             CHARTS = [self.area_var.get(), self.bar_var.get(), self.pie_var.get(), self.plot_var.get()]
-            if (self.combobox_variables1.get() == IS_EMPTY or self.combobox_variables1.get()
-                not in self.data_processing_usr1['values'] or not any(CHARTS)) or \
-                    (self.combobox_variables2.get() == IS_EMPTY or self.combobox_variables2.get()
-                     not in self.data_processing_usr2['values'] or not any(CHARTS)):
+
+            if p1 == IS_EMPTY or p1 not in self.data_processing_usr1['values'] or not any(CHARTS):
                 raise ValueError
 
-            clues = list(self.db.keys())
-
-            i = self.data_processing_usr1['values'].index(self.data_processing_usr1.get())
             if CHARTS[0]:
-                pass
-            if CHARTS[1]:
-                pass
-            if CHARTS[2]:
-                pass
-            if CHARTS[3]:
-                pass
+                fig1, ax1 = plt.subplots()
+                diagram_0 = self.db[p1].value_counts()
+                diagram_0 = diagram_0.sort_index()
+                diagram_0.plot(kind='area', x=diagram_0.index, y=diagram_0.values, ax=ax1)
+                plt.title(f"Number of Incidences according to {p1}")
+                plt.xlabel(f'{p1}')
+                plt.ylabel(f'Incidence numbers ')
+                plt.grid()
 
-            plt.grid()
+
+            if CHARTS[1]:
+                fig1, ax2 = plt.subplots()
+                diagram_1 = self.db[p1].value_counts()
+                diagram_1 = diagram_1.sort_index()
+                if RUN_TIME % 2 == 0:
+                    diagram_1.plot(kind='bar', x=diagram_1.index, y=diagram_1.values, ax=ax2, hatch='+', color="#227C70")
+                else:
+                    diagram_1.plot(kind='bar', x=diagram_1.index, y=diagram_1.values, ax=ax2, color="#3C2317")
+                plt.title(f"Number of Incidences according to {p1}")
+                plt.xlabel(f'{p1}')
+                plt.ylabel(f'Incidence numbers ')
+                plt.grid()
+
+            if CHARTS[2]:
+                fig1, ax3 = plt.subplots()
+                diagram_2 = self.db[p1].value_counts()
+                diagram_2 = diagram_2.sort_index()
+                explode = []
+                MAX_ELEM_INDEX = 0
+                MAX_ELEM = list(diagram_2)[MAX_ELEM_INDEX]
+                for i in range(len(diagram_2.values)):
+                    curr_elem = list(diagram_2.values)[i]
+                    if MAX_ELEM < curr_elem:
+                        MAX_ELEM = curr_elem
+                        MAX_ELEM_INDEX = i
+                    explode.append(0)
+                explode[MAX_ELEM_INDEX] = 0.1
+                print(len(explode), len(diagram_2.keys()))
+
+                diagram_2.plot(kind='pie', x=diagram_2.index, y=diagram_2.values, ax=ax3, explode=explode, shadow=True,
+                               startangle=90, autopct='%1.1f%%',
+                               wedgeprops={'edgecolor': '#85586F'}, figsize=(11, 5))
+                plt.title(f"Number of Incidences according to {p1}")
+                plt.grid()
+
+            if CHARTS[3]:
+                fig1, ax4 = plt.subplots()
+                diagram_3 = self.db[p1].value_counts()
+                diagram_3 = diagram_3.sort_index()
+                if RUN_TIME % 2 == 0:
+                    diagram_3.plot(kind='line', x=diagram_3.index, y=diagram_3.values, ax=ax4,
+                                   color='#444444', linestyle='dashed', lw=3, scatter=True)
+                else:
+                    diagram_3.plot(kind='line', x=diagram_3.index, y=diagram_3.values, ax=ax4,
+                                   color='#88A47C', linestyle='dashdot', lw=3)
+                plt.title(f"Number of Incidences according to {p1}")
+                plt.xlabel(f'{p1}')
+                plt.ylabel(f'Incidence numbers ')
+                plt.grid()
+
+            RUN_TIME += 1
             plt.show()
             plt.close()
+
+
+
         except ValueError:
-            messagebox.showinfo(title="Oops....", message="Verify that Chart type is selected and filter key is "
-                                                          "selected in the drop-down list")
+            messagebox.showinfo(parent=self, title="Error",
+                                message="Verify that Chart type  and filter key are selected. "
+                                        "Notice that, filter key must be chosen from the drop-down list")
+
+
+    def add(self):
+        conn = sqlite3.connect(database=DATABASE_PATH)
+        c = conn.cursor()
+        if not any([self.INCIDENT_KEY_entry.get(),  self.OCCUR_DATE_entry.get(),  self.OCCUR_TIME_entry.get(), self.BOROUGH_entry.get(), self.PRECINCT_entry.get(), self.JURISDICTION_CODE_entry.get(),
+                    self.STATISTICAL_MURDER_FLAG_entry.get(), self.VIC_AGE_GROUP_entry.get(), self.VIC_SEX_entry.get(), self.VIC_RACE_entry.get()]):
+            messagebox.showerror(parent=self.new_window, title="Error", message="Please enter a value for at least "
+                                                                                "one field.")
+            return
+
+        c.execute('INSERT INTO crimes VALUES(:incident_key, :date, :time, :borough, :precinct, :jurisdiction_code, '
+                  ':statistical_murder_flag, :vic_age_grp, :vic_sex, :vic_race)', {
+                      'incident_key': self.INCIDENT_KEY_entry.get(),
+                      'date': self.OCCUR_DATE_entry.get(),
+                      'time': self.OCCUR_TIME_entry.get(),
+                      'borough': self.BOROUGH_entry.get(),
+                      'precinct': self.PRECINCT_entry.get(),
+                      'jurisdiction_code': self.JURISDICTION_CODE_entry.get(),
+                      'statistical_murder_flag': self.STATISTICAL_MURDER_FLAG_entry.get(),
+                      'vic_age_grp': self.VIC_AGE_GROUP_entry.get(),
+                      'vic_sex': self.VIC_SEX_entry.get(),
+                      'vic_race': self.VIC_RACE_entry.get(),
+                  })
+
+        conn.commit()
+        conn.close()
+
+        # Clear the textboxes
+        self.INCIDENT_KEY_entry.delete(0, 'end')
+        self.OCCUR_DATE_entry.delete(0, 'end')
+        self.OCCUR_TIME_entry.delete(0, 'end')
+        self.BOROUGH_entry.delete(0, 'end')
+        self.PRECINCT_entry.delete(0, 'end')
+        self.JURISDICTION_CODE_entry.delete(0, 'end')
+        self.STATISTICAL_MURDER_FLAG_entry.delete(0, 'end')
+        self.VIC_AGE_GROUP_entry.delete(0, 'end')
+        self.VIC_SEX_entry.delete(0, 'end')
+        self.VIC_RACE_entry.delete(0, 'end')
+
+        self.__write_into_csv__()
+
+
+    def find_record(self):
+        conn = sqlite3.connect(database=DATABASE_PATH)
+        c = conn.cursor()
+
+        incident_key = self.INCIDENT_KEY_entry.get()
+        occur_date = self.OCCUR_DATE_entry.get()
+        occur_time = self.OCCUR_TIME_entry.get()
+        borough = self.BOROUGH_entry.get()
+        precinct = self.PRECINCT_entry.get()
+        jurisdiction_code = self.JURISDICTION_CODE_entry.get()
+        statistical_murder_flag = self.STATISTICAL_MURDER_FLAG_entry.get()
+        vic_age_group = self.VIC_AGE_GROUP_entry.get()
+        vic_sex = self.VIC_SEX_entry.get()
+        vic_race = self.VIC_RACE_entry.get()
+
+        self.INCIDENT_KEY_entry.delete(0, 'end')
+        self.OCCUR_DATE_entry.delete(0, 'end')
+        self.OCCUR_TIME_entry.delete(0, 'end')
+        self.BOROUGH_entry.delete(0, 'end')
+        self.PRECINCT_entry.delete(0, 'end')
+        self.JURISDICTION_CODE_entry.delete(0, 'end')
+        self.STATISTICAL_MURDER_FLAG_entry.delete(0, 'end')
+        self.VIC_AGE_GROUP_entry.delete(0, 'end')
+        self.VIC_SEX_entry.delete(0, 'end')
+        self.VIC_RACE_entry.delete(0, 'end')
+
+        self.result_label.config(text="")
+
+        if not any([incident_key, occur_date, occur_time, borough, precinct, jurisdiction_code,
+                    statistical_murder_flag, vic_age_group, vic_sex, vic_race]):
+            messagebox.showerror(parent=self.new_window, title="Error", message="Please enter a value for at least "
+                                                                                "one field.")
+            return
+
+        record = list(main_window.search_database(incident_key=incident_key, occur_date=occur_date, occur_time=occur_time, borough=borough, precinct=precinct, jurisdiction_code=jurisdiction_code,
+                                                  statistical_murder_flag=statistical_murder_flag, vic_age_group=vic_age_group, vic_sex=vic_sex, vic_race=vic_race))
+
+        if record:
+
+            self.INCIDENT_KEY_entry.insert(0, record[0][0])
+            self.OCCUR_DATE_entry.insert(0, record[0][1])
+            self.OCCUR_TIME_entry.insert(0, record[0][2])
+            self.BOROUGH_entry.insert(0, record[0][3])
+            self.PRECINCT_entry.insert(0, record[0][4])
+            self.JURISDICTION_CODE_entry.insert(0, record[0][5])
+            self.STATISTICAL_MURDER_FLAG_entry.insert(0, record[0][6])
+            self.VIC_AGE_GROUP_entry.insert(0, record[0][7])
+            self.VIC_SEX_entry.insert(0, record[0][8])
+            self.VIC_RACE_entry.insert(0, record[0][9])
+
+            self.result_label.config(text="Succesfylly Found ☑ ")
+        else:
+            messagebox.showerror(parent=self.new_window, title="Error", message="No record was found with the given "
+                                                                                "information.")
+
+        conn.commit()
+        conn.close()
+
+
+    def get_info(self):
+
+        self.new_window = tk.Toplevel()
+        self.new_window.geometry("750x500+0+0")
+        self.new_window.resizable(False, False)
+        self.new_window.config(padx=10, pady=10)
+        self.title_Label = tk.Label(self.new_window, text="Database", font=("Sylfaen", 36, 'bold'))
+        self.title_Label.grid(row=0, column=1, columnspan=2, padx=4, pady=10, ipadx=40)
+
+
+
+        self.result_label = tk.Label(self.new_window, text="", font=('Sylfaen', 12, 'normal'))
+        self.result_label.grid(row=12, column=0, columnspan=2)
+
+
+        self.INCIDENT_KEY_entry = tk.Entry(self.new_window, width=30)
+        self.OCCUR_DATE_entry = tk.Entry(self.new_window, width=30)
+        self.OCCUR_TIME_entry = tk.Entry(self.new_window, width=30)
+        self.BOROUGH_entry = tk.Entry(self.new_window, width=30)
+        self.PRECINCT_entry = tk.Entry(self.new_window, width=30)
+        self.JURISDICTION_CODE_entry = tk.Entry(self.new_window, width=30)
+        self.STATISTICAL_MURDER_FLAG_entry = tk.Entry(self.new_window, width=30)
+        self.VIC_AGE_GROUP_entry = tk.Entry(self.new_window, width=30)
+        self.VIC_SEX_entry = tk.Entry(self.new_window, width=30)
+        self.VIC_RACE_entry = tk.Entry(self.new_window, width=30)
+
+        self.INCIDENT_KEY_entry.grid(row=1, column=2, padx=10, ipadx=40, columnspan=2)
+        self.OCCUR_DATE_entry.grid(row=2, column=2, padx=10, ipadx=40, columnspan=2)
+        self.OCCUR_TIME_entry.grid(row=3, column=2, padx=10, ipadx=40, columnspan=2)
+        self.BOROUGH_entry.grid(row=4, column=2, padx=10, ipadx=40, columnspan=2)
+        self.PRECINCT_entry.grid(row=5, column=2, padx=10, ipadx=40, columnspan=2)
+        self.JURISDICTION_CODE_entry.grid(row=6, column=2, padx=10, ipadx=40, columnspan=2)
+        self.STATISTICAL_MURDER_FLAG_entry.grid(row=7, column=2, padx=10, ipadx=40, columnspan=2)
+        self.VIC_AGE_GROUP_entry.grid(row=8, column=2, padx=10, ipadx=40, columnspan=2)
+        self.VIC_SEX_entry.grid(row=9, column=2, padx=10, ipadx=40, columnspan=2)
+        self.VIC_RACE_entry.grid(row=10, column=2, padx=10, ipadx=40, columnspan=2)
+
+        VIC_RACE_label = tk.Label(self.new_window, text="VIC_RACE: ")
+        VIC_SEX_label = tk.Label(self.new_window, text="VIC_SEX: ")
+        VIC_AGE_GROUP_label = tk.Label(self.new_window, text="VIC_AGE_GROUP: ")
+        STATISTICAL_MURDER_FLAG_label = tk.Label(self.new_window, text="STATISTICAL_MURDER_FLAG: ")
+        JURISDICTION_CODE_label = tk.Label(self.new_window, text="JURISDICTION_CODE: ")
+        PRECINCT_label = tk.Label(self.new_window, text="PRECINCT: ")
+        BOROUGH_label = tk.Label(self.new_window, text="BOROUGH: ")
+        OCCUR_TIME_label = tk.Label(self.new_window, text="OCCUR_TIME: ")
+        OCCUR_DATE_label = tk.Label(self.new_window, text="OCCUR_DATE: ")
+        INCIDENT_KEY_label = tk.Label(self.new_window, text="INCIDENT_KEY: ")
+
+        INCIDENT_KEY_label.grid(row=1, column=0, padx=10, ipadx=40)
+        OCCUR_DATE_label.grid(row=2, column=0, padx=10, ipadx=40)
+        OCCUR_TIME_label.grid(row=3, column=0, padx=10, ipadx=40)
+        BOROUGH_label.grid(row=4, column=0, padx=10, ipadx=40)
+        PRECINCT_label.grid(row=5, column=0, padx=10, ipadx=40)
+        JURISDICTION_CODE_label.grid(row=6, column=0, padx=10, ipadx=40)
+        STATISTICAL_MURDER_FLAG_label.grid(row=7, column=0, padx=10, ipadx=40)
+        VIC_AGE_GROUP_label.grid(row=8, column=0, padx=10, ipadx=40)
+        VIC_SEX_label.grid(row=9, column=0, padx=10, ipadx=40)
+        VIC_RACE_label.grid(row=10, column=0, padx=10, ipadx=40)
+
+        ADD_btn = tk.Button(self.new_window, width=22, text='Add Record to the database', command=self.add)
+        ADD_btn.grid(row=11, column=1, columnspan=2, pady=10, padx=10, ipadx=40)
+
+        SHOW_btn = tk.Button(self.new_window, width=22, text='Find Record', command=self.find_record)
+        SHOW_btn.grid(row=12, column=1, columnspan=2, padx=10, ipadx=40)
+
+
+    @staticmethod
+    def search_database(incident_key=None, occur_date=None, occur_time=None, borough=None, precinct=None,
+                        jurisdiction_code=None, statistical_murder_flag=None, vic_age_group=None,
+                        vic_sex=None, vic_race=None):
+        # Connect to the database
+        conn = sqlite3.connect(database=DATABASE_PATH)
+        c = conn.cursor()
+
+        # Define the SELECT statement
+        sql = "SELECT * FROM crimes"
+        params = []
+        # Add the values of the parameters to the SELECT statement as conditions
+        conditions = []
+        if incident_key:
+            conditions.append("INCIDENT_KEY=?")
+            params.append(incident_key)
+        if occur_date:
+            conditions.append("OCCUR_DATE=?")
+            params.append(occur_date)
+        if occur_time:
+            conditions.append("OCCUR_TIME=?")
+            params.append(occur_time)
+        if borough:
+            conditions.append("BOROUGH=?")
+            params.append(borough)
+        if precinct:
+            conditions.append("PRECINCT=?")
+            params.append(precinct)
+        if jurisdiction_code:
+            conditions.append("JURISDICTION_CODE=?")
+            params.append(jurisdiction_code)
+        if statistical_murder_flag:
+            conditions.append("STATISTICAL_MURDER_FLAG=?")
+            params.append(statistical_murder_flag)
+        if vic_age_group:
+            conditions.append("VIC_AGE_GROUP=?")
+            params.append(vic_age_group)
+        if vic_sex:
+            conditions.append("VIC_SEX=?")
+            params.append(vic_sex)
+        if vic_race:
+            conditions.append("VIC_RACE=?")
+            params.append(vic_race)
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+        c.execute(sql, params)
+        record = c.fetchall()
+
+        conn.close()
+        return record if record else None
+
+
+    def __write_into_csv__(self):
+        conn = sqlite3.connect(database=DATABASE_PATH)
+        df = pd.read_sql_query("SELECT * FROM crimes", conn)
+        df.to_csv(FILE_NAME, index=False)
+        df_csv = pd.read_csv(FILE_NAME)
+        conn = sqlite3.connect(database=DATABASE_PATH)
+        df_new = pd.read_sql_query("SELECT * FROM crimes WHERE INCIDENT_KEY NOT IN (SELECT INCIDENT_KEY FROM crimes)",
+                                   conn)
+        df_combined = pd.concat([df_csv, df_new]).drop_duplicates()
+        df_combined.to_csv(FILE_NAME, index=False)
+
+
