@@ -19,6 +19,8 @@ import tkinter as tk
 from tkinter import Tk, ttk, messagebox
 import matplotlib.pyplot as plt
 import pandas as pd
+import threading
+
 try:
     # ------------------------ Constants --------------------------------
     BACKGROUND_COLOR = "#6B011F"
@@ -28,9 +30,49 @@ try:
     RUN_TIME = 0
     df = pd.read_csv(filepath_or_buffer=FILE_NAME)
 
-    # ------------------------ Class Definition --------------------------
+
+    # todo: Get the data from the dataframe and put it into the SQLite3 database
+
+
+    def write_to_database(dataframe):
+        """
+        this function get the data from the pandas dataframe turns it into the SQL query and creates a table if
+        doesn't exist at all else, replaces the data so modifies things inside.
+        :param dataframe: dataframe where from we should get the data
+        :return: None
+        """
+        conn = sqlite3.connect(DATABASE_PATH)
+        dataframe.to_sql('crimes', conn, index=False, if_exists='replace')
+        conn.close()
+
+    # todo: complete task above while also working on other tasks, I chose threading.
+    t = threading.Thread(target=write_to_database, args=(df,))
+    t.start()
+    t.join()
+
+
+    def save_fig(option, ppltobj):
+        """
+        Function saves the matplotlib figures in a png format.
+        :param option: 0 - area chart, 1 - bar chart, 2 - pie chart, 3 - line chart exactly the same as in CHARTS
+        :param ppltobj: matplotlib.pyplot object
+        :return: None
+        """
+        initial = "./Charts/"
+        if option == 0:
+            ppltobj.savefig(initial + "area.png")
+        elif option == 1:
+            ppltobj.savefig(initial + "bar.png")
+        elif option == 2:
+            ppltobj.savefig(initial + "pie.png")
+        elif option == 3:
+            ppltobj.savefig(initial + "line.png")
+
+
     class main_window(Tk):
-        # ------------------------ Constructor UI/UX ---------------------
+
+        # ------------------- Constructor UI/UX --------------------------
+
         def __init__(self):
             super().__init__()
             self.df = df  # Getting the data from the dataframe
@@ -55,30 +97,38 @@ try:
             self.plot_var = tk.BooleanVar(self, False)  # 1.4  Plot chart type
             self.pie_var = tk.BooleanVar(self, False)  # 1.5  Pie chart type
 
-
             # fixed: create a drop-down list for better UX
             self.drop_down = ttk.Combobox(self, width=37, textvariable=self.combobox_var,
-                                          values=[element for element in list(self.df.keys()) if element not in ['incident_key','OCCUR_DATE','OCCUR_TIME']])
+                                          values=[element for element in list(self.df.keys()) if
+                                                  element not in ['incident_key', 'OCCUR_DATE', 'OCCUR_TIME']])
 
             # Buttons for Data processing in two different ways
-            tk.Button(self, text="Get Info", bg="#0A2647", fg="#F1F7B5", command=self.get_info, width=12).grid(row=1, column=2, padx=10)
-            tk.Button(self, text="Build Chart", bg="#0A2647", fg="#F1F7B5", command=self.plot_chart, width=12).grid(row=5, column=1, padx=10, pady=20, ipadx=20)
-
+            tk.Button(self, text="Get Info", bg="#0A2647", fg="#F1F7B5", command=self.get_info, width=12).grid(row=1,
+                                                                                                               column=2,
+                                                                                                               padx=10)
+            tk.Button(self, text="Build Chart", bg="#0A2647", fg="#F1F7B5", command=self.plot_chart, width=12).grid(
+                row=5, column=1, padx=10, pady=20, ipadx=20)
 
             # Check Buttons for several types of Chart types
             tk.Checkbutton(self, width=15, text="Area chart", activeforeground="white", fg="white", bg="#0A2647",
-                           activebackground="#0A2647", selectcolor="#0A2647", variable=self.area_var).grid(row=2, column=0)
+                           activebackground="#0A2647", selectcolor="#0A2647", variable=self.area_var).grid(row=2,
+                                                                                                           column=0)
             tk.Checkbutton(self, width=15, text="Bar chart", activeforeground="white", fg="white", bg="#0A2647",
-                           activebackground="#0A2647", selectcolor="#0A2647", variable=self.bar_var,).grid(row=2, column=1)
+                           activebackground="#0A2647", selectcolor="#0A2647", variable=self.bar_var, ).grid(row=2,
+                                                                                                            column=1)
             tk.Checkbutton(self, width=15, text="Plot chart", activeforeground="white", fg="white", bg="#0A2647",
-                           activebackground="#0A2647", selectcolor="#0A2647", variable=self.plot_var).grid(row=2, column=2)
+                           activebackground="#0A2647", selectcolor="#0A2647", variable=self.plot_var).grid(row=2,
+                                                                                                           column=2)
             tk.Checkbutton(self, width=15, text="Pie chart", activeforeground="white", fg="white", bg="#0A2647",
-                           activebackground="#0A2647", selectcolor="#0A2647", variable=self.pie_var).grid(row=3, column=1, pady=10)
+                           activebackground="#0A2647", selectcolor="#0A2647", variable=self.pie_var).grid(row=3,
+                                                                                                          column=1,
+                                                                                                          pady=10)
             # Put the Drop-down list somewhere onto the screen, I prefer using grid manager instead of pack or place
             self.drop_down.grid(row=1, column=1)
             self.mainloop()
 
-        # ------------------------ Functionality -------------------------
+        # -------------------- Functionality ----------------------------
+
 
         def plot_chart(self):
             """
@@ -105,6 +155,7 @@ try:
                     plt.title(f"Number of Incidences according to {p1}")
                     plt.xlabel(f'{p1}')
                     plt.ylabel(f'Incidence numbers ')
+                    save_fig(0, plt)
                     plt.grid()
 
                 if CHARTS[1]:
@@ -120,6 +171,7 @@ try:
                     plt.title(f"Number of Incidences according to {p1}")
                     plt.xlabel(f'{p1}')
                     plt.ylabel(f'Incidence numbers ')
+                    save_fig(1, plt)
                     plt.grid()
 
                 if CHARTS[2]:
@@ -129,19 +181,19 @@ try:
                     explode = []
                     MAX_ELEM_INDEX = 0
                     MAX_ELEM = list(diagram_2)[MAX_ELEM_INDEX]
-                    for i in range(len(diagram_2.values)):
-                        curr_elem = list(diagram_2.values)[i]
+                    for i, curr_elem in enumerate(diagram_2.values):
                         if MAX_ELEM < curr_elem:
                             MAX_ELEM = curr_elem
                             MAX_ELEM_INDEX = i
                         explode.append(0)
                     explode[MAX_ELEM_INDEX] = 0.1
-                    print(len(explode), len(diagram_2.keys()))
 
-                    diagram_2.plot(kind='pie', x=diagram_2.index, y=diagram_2.values, ax=ax3, explode=explode, shadow=True,
+                    diagram_2.plot(kind='pie', x=diagram_2.index, y=diagram_2.values, ax=ax3, explode=explode,
+                                   shadow=True,
                                    startangle=90, autopct='%1.1f%%',
                                    wedgeprops={'edgecolor': '#85586F'}, figsize=(11, 5))
                     plt.title(f"Number of Incidences according to {p1}")
+                    save_fig(2, plt)
                     plt.grid()
 
                 if CHARTS[3]:
@@ -154,9 +206,11 @@ try:
                     else:
                         diagram_3.plot(kind='line', x=diagram_3.index, y=diagram_3.values, ax=ax4,
                                        color='#88A47C', linestyle='dashdot', lw=3)
+
                     plt.title(f"Number of Incidences according to {p1}")
                     plt.xlabel(f'{p1}')
                     plt.ylabel(f'Incidence numbers ')
+                    save_fig(3, plt)
                     plt.grid()
 
                 RUN_TIME += 1
@@ -170,12 +224,14 @@ try:
             :return: None
             """
             try:
-                if not any([self.INCIDENT_KEY_entry.get(),  self.OCCUR_DATE_entry.get(),  self.OCCUR_TIME_entry.get(), self.BOROUGH_entry.get(), self.PRECINCT_entry.get(), self.JURISDICTION_CODE_entry.get(),
-                            self.STATISTICAL_MURDER_FLAG_entry.get(), self.VIC_AGE_GROUP_entry.get(), self.VIC_SEX_entry.get(), self.VIC_RACE_entry.get()]):
+                if not any([self.INCIDENT_KEY_entry.get(), self.OCCUR_DATE_entry.get(), self.OCCUR_TIME_entry.get(),
+                            self.BOROUGH_entry.get(), self.PRECINCT_entry.get(), self.JURISDICTION_CODE_entry.get(),
+                            self.STATISTICAL_MURDER_FLAG_entry.get(), self.VIC_AGE_GROUP_entry.get(),
+                            self.VIC_SEX_entry.get(), self.VIC_RACE_entry.get()]):
                     raise ValueError
             except ValueError:
                 messagebox.showerror(parent=self.new_window, title="Error", message="Please enter a value for at least "
-                                                                                "one field.")
+                                                                                    "one field.")
             else:
                 # todo: connect SQLite3 database
                 conn = sqlite3.connect(database=DATABASE_PATH)
@@ -199,15 +255,11 @@ try:
                 conn.close()
 
 
+                messagebox.showinfo(parent=self.new_window,
+                                     title="Congrats",
+                                     message="Data has been updated successfully into the database")
+
                 self.clear_GUI()
-                answer = messagebox.askyesno(parent=self.new_window,
-                                             title="Congrats",
-                                             message="Data has been updated succesfully, Do you want to "
-                                                     "write them into the data_file? ")
-                if answer:
-                    self.__write_into_csv__()
-
-
 
         def clear_GUI(self):
             """
@@ -246,18 +298,23 @@ try:
             vic_sex = self.VIC_SEX_entry.get()
             vic_race = self.VIC_RACE_entry.get()
 
-
             try:
                 # todo : check whether if at least one field is filled in
-                if not any([incident_key, occur_date, occur_time, borough, precinct, jurisdiction_code, statistical_murder_flag, vic_age_group, vic_sex, vic_race]):
+                if not any([incident_key, occur_date, occur_time, borough, precinct, jurisdiction_code,
+                            statistical_murder_flag, vic_age_group, vic_sex, vic_race]):
                     raise ValueError
                 # todo: check if this line thows TypeError or not, if yes, that means that user provide invalid data that can not be found in out database
-                record = list(main_window.search_database(incident_key=incident_key, occur_date=occur_date, occur_time=occur_time, borough=borough, precinct=precinct, jurisdiction_code=jurisdiction_code,
-                                                          statistical_murder_flag=statistical_murder_flag, vic_age_group=vic_age_group, vic_sex=vic_sex, vic_race=vic_race))
+                record = list(
+                    main_window.search_database(incident_key=incident_key, occur_date=occur_date, occur_time=occur_time,
+                                                borough=borough, precinct=precinct, jurisdiction_code=jurisdiction_code,
+                                                statistical_murder_flag=statistical_murder_flag,
+                                                vic_age_group=vic_age_group, vic_sex=vic_sex, vic_race=vic_race))
             except TypeError:
-                messagebox.showinfo(parent=self.new_window, title="Please check provided data", message="No record was found with the given information.")
+                messagebox.showinfo(parent=self.new_window, title="Please check provided data",
+                                    message="No record was found with the given information.")
             except ValueError:
-                messagebox.showinfo(parent=self.new_window, title="Please check provided data", message="Please enter a value for at least one field.")
+                messagebox.showinfo(parent=self.new_window, title="Please check provided data",
+                                    message="Please enter a value for at least one field.")
             else:
                 # todo: as soon as the user will put the information into the entries, program clears the screen,
                 # todo: as the hint that the data has been successfully updated
@@ -278,7 +335,6 @@ try:
             conn.commit()
             conn.close()
 
-
         def get_info(self):
             """
             This function basically is the general function for the processing data in terms of relation with databases.
@@ -294,11 +350,8 @@ try:
             self.title_Label = tk.Label(self.new_window, text="Database", font=("Sylfaen", 36, 'bold'))
             self.title_Label.grid(row=0, column=1, columnspan=2, pady=10, ipadx=10)
 
-
-
             self.result_label = tk.Label(self.new_window, text="", font=('Sylfaen', 12, 'normal'))
             self.result_label.grid(row=12, column=0, columnspan=2)
-
 
             self.INCIDENT_KEY_entry = tk.Entry(self.new_window, width=30)
             self.OCCUR_DATE_entry = tk.Entry(self.new_window, width=30)
@@ -351,8 +404,7 @@ try:
             SHOW_btn.grid(row=12, column=1, columnspan=2, pady=10, padx=10, ipadx=40)
 
             SHOW_btn = tk.Button(self.new_window, width=22, text='Clear Record', command=self.clear_GUI)
-            SHOW_btn.grid(row=13, column=1, columnspan=2, pady=10,  padx=10, ipadx=40)
-
+            SHOW_btn.grid(row=13, column=1, columnspan=2, pady=10, padx=10, ipadx=40)
 
         @staticmethod
         def search_database(incident_key=None, occur_date=None, occur_time=None, borough=None, precinct=None,
@@ -421,27 +473,10 @@ try:
             conn.close()
             return record if record else None
 
-
-        def __write_into_csv__(self):
-            """
-            whether if the user decides to write the updated data from the database into the data file (.csv file)
-            this function is responsible to write them out inside
-            :return: None
-            """
-            conn = sqlite3.connect(database=DATABASE_PATH)
-            self.df = pd.read_sql_query("SELECT * FROM crimes", conn)
-            self.df.to_csv(FILE_NAME, index=False)
-            df_csv = pd.read_csv(FILE_NAME)
-            df_new = pd.read_sql_query("SELECT * FROM crimes WHERE INCIDENT_KEY NOT IN (SELECT INCIDENT_KEY FROM crimes)", conn)
-            df_combined = pd.concat([df_csv, df_new]).drop_duplicates()
-            df_combined.to_csv(FILE_NAME, index=False)
-            conn.close()
-            return
 except FileNotFoundError:
     messagebox.showinfo(title="File Not Found", message="Please check out the data file")
     exit(1)
 except sqlite3.OperationalError:
-    messagebox.showinfo(title="Database Issue", message="Please make sure that database file exist or it is not damaged")
+    messagebox.showinfo(title="Database Issue",
+                        message="Please make sure that database file exist or it is not damaged")
     exit(1)
-
-
