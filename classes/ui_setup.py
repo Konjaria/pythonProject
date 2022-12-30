@@ -60,13 +60,13 @@ try:
         """
         initial = "./Charts/"
         if option == 0:
-            ppltobj.savefig(initial + "area.png")
+            ppltobj.savefig(initial + f"area{RUN_TIME + 1}.png")
         elif option == 1:
-            ppltobj.savefig(initial + "bar.png")
+            ppltobj.savefig(initial + f"bar{RUN_TIME + 1}.png")
         elif option == 2:
-            ppltobj.savefig(initial + "pie.png")
+            ppltobj.savefig(initial + f"pie{RUN_TIME + 1}.png")
         elif option == 3:
-            ppltobj.savefig(initial + "line.png")
+            ppltobj.savefig(initial + f"line{RUN_TIME + 1}.png")
 
 
     class main_window(Tk):
@@ -151,7 +151,7 @@ try:
                     fig1, ax1 = plt.subplots()
                     diagram_0 = self.df[p1].value_counts()
                     diagram_0 = diagram_0.sort_index()
-                    diagram_0.plot(kind='area', x=diagram_0.index, y=diagram_0.values, ax=ax1)
+                    diagram_0.plot(kind='area', x=diagram_0.index, y=diagram_0.values, ax=ax1, color="green")
                     plt.title(f"Number of Incidences according to {p1}")
                     plt.xlabel(f'{p1}')
                     plt.ylabel(f'Incidence numbers ')
@@ -164,9 +164,9 @@ try:
                     diagram_1 = diagram_1.sort_index()
                     if RUN_TIME % 2 == 0:
                         diagram_1.plot(kind='bar', x=diagram_1.index, y=diagram_1.values, ax=ax2, hatch='+',
-                                       color="#227C70")
+                                       color="brown")
                     else:
-                        diagram_1.plot(kind='bar', x=diagram_1.index, y=diagram_1.values, ax=ax2, color="#3C2317")
+                        diagram_1.plot(kind='barh', x=diagram_1.index, y=diagram_1.values, ax=ax2, color="#3C2317")
 
                     plt.title(f"Number of Incidences according to {p1}")
                     plt.xlabel(f'{p1}')
